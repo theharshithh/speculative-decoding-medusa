@@ -60,7 +60,7 @@ To train a Medusa model:
 python setup_dataset.py --input_file your_data.json
 ```
  - This will create train.json and eval.json in the current directory.
- - ShareGPT dataset link (here)[https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/blob/main/ShareGPT_V3_unfiltered_cleaned_split_no_imsorry.json]
+ - ShareGPT dataset link [here](https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/blob/main/ShareGPT_V3_unfiltered_cleaned_split_no_imsorry.json)
 
 2. Start training:
 ```bash
@@ -101,4 +101,4 @@ python infer_onnx.py
 
 ## Training Logs:
 
-Here is the (Wandb project)[https://wandb.ai/theharshithdev-exp/huggingface/runs/89ut3wkv?nw=nwusertheharshithdev] to view the traning runs. 
+Here is the [Wandb project](https://wandb.ai/theharshithdev-exp/huggingface/runs/89ut3wkv?nw=nwusertheharshithdev) to view the traning runs. 
