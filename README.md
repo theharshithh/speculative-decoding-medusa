@@ -98,3 +98,7 @@ To compile the model to ONNX format:
 ```bash
 python infer_onnx.py
 ```
+
+## Training Logs:
+
+Here is the (Wandb project)[https://wandb.ai/theharshithdev-exp/huggingface/runs/89ut3wkv?nw=nwusertheharshithdev] to view the traning runs. 
