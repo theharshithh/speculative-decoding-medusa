@@ -235,7 +235,7 @@ def train():
     trainer = CustomizedTrainer(
         model=medusa_model,
         tokenizer=tokenizer,
-        args=training_args,
+        args=training_args,        
         **data_module
     )
 
@@ -252,9 +252,9 @@ def train():
     if training_args.local_rank in [-1, 0]:
         rank0_print("Saving Medusa heads...")
         if hasattr(medusa_model, "module"):
-            medusa_head = medusa_model.module.medusa_heads
+            medusa_head = medusa_model.module.medusa_head
         else:
-            medusa_head = medusa_model.medusa_heads
+            medusa_head = medusa_model.medusa_head
 
         with deepspeed.zero.GatheredParameters(medusa_head.parameters()):
             state_dict = medusa_head.state_dict()
