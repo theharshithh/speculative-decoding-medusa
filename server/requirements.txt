@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+torch
+transformers
+aiohttp
+python-multipart

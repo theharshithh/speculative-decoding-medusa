@@ -1,0 +1,17 @@
+torch
+transformers
+pydantic
+deepspeed
+safetensors
+accelerate
+bitsandbytes
+onnxruntime-gpu
+onnx
+optimum
+fastapi
+uvicorn
+python-multipart
+aiohttp
+numpy
+tqdm
+wandb
