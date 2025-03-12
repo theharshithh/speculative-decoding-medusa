@@ -24,9 +24,6 @@ def pad_path(path, length, pad_value=-2):
     then no padding occurs, and the original path is returned.
     """
     
-    # Calculate the number of padding values needed by subtracting the length
-    # of the path from the desired length.
-    # Append the padding values to the original path and return the new list.
     return path + [pad_value] * (length - len(path))
 
 def generate_medusa_buffers(medusa_choices, device="cuda"):
@@ -65,7 +62,7 @@ def generate_medusa_buffers(medusa_choices, device="cuda"):
     sorted_medusa_choices = sorted(medusa_choices, key=lambda x: (len(x), x))
     medusa_len = len(sorted_medusa_choices) + 1
 
-    # Initialize depth_counts to keep track of how many choices have a particular depth
+
     depth_counts = []
     prev_depth = 0
     for path in sorted_medusa_choices:
@@ -75,14 +72,14 @@ def generate_medusa_buffers(medusa_choices, device="cuda"):
         depth_counts[depth - 1] += 1
         prev_depth = depth
     
-    # Create the attention mask for Medusa
+
     medusa_attn_mask = torch.eye(medusa_len, medusa_len)
     medusa_attn_mask[:, 0] = 1
     start = 0
     for i in range(len(depth_counts)):
         for j in range(depth_counts[i]):
             cur_medusa_choice = sorted_medusa_choices[start + j]
-            # retrieve ancestor position
+
             if len(cur_medusa_choice) == 1:
                 continue
             ancestor_idx = []
@@ -91,7 +88,6 @@ def generate_medusa_buffers(medusa_choices, device="cuda"):
             medusa_attn_mask[j + start + 1, ancestor_idx] = 1
         start += depth_counts[i]
 
-    # Generate tree indices for the Medusa structure
     medusa_tree_indices = torch.zeros(medusa_len, dtype=torch.long)
     medusa_tree_indices[0] = 0
     start = 0
@@ -101,14 +97,12 @@ def generate_medusa_buffers(medusa_choices, device="cuda"):
             medusa_tree_indices[start + j + 1] = cur_medusa_choice[-1] + TOPK * i + 1
         start += depth_counts[i]
 
-    # Generate position IDs for the Medusa structure
     medusa_position_ids = torch.zeros(medusa_len, dtype=torch.long)
     start = 0
     for i in range(len(depth_counts)):
         medusa_position_ids[start + 1: start + depth_counts[i] + 1] = i + 1
         start += depth_counts[i]
 
-    # Generate retrieval indices for Medusa structure verification
     retrieve_indices_nest = []
     retrieve_paths = []
     for i in range(len(sorted_medusa_choices)):
@@ -171,35 +165,11 @@ def initialize_medusa(input_ids, model, medusa_attn_mask, past_key_values):
 def reset_medusa_mode(
     model,
 ):
-    """
-    - clears the medusa_mask and medusa_mode in the base model.
-    - resets the current lengths in the past key-values to zero for all layers.
-    
-    Args:
-    - model (MedusaLMHead): The model containing the Medusa layers and base model.
-    - past_key_values (list of torch.Tensor): Contains past hidden states and past attention values.
-
-    Returns:
-    - None
-    """
     model.base_model.model.medusa_mask = None
     model.base_model.model.medusa_mode = None
 
 
 def reset_past_key_values(passed_key_values):
-    """
-    Resets the current lengths in the passed key-values to zero.
-
-    This function is designed to be used during the evaluation of a baseline model.
-    It iterates through each layer's key-values and sets their current lengths to zero,
-    effectively resetting their state.
-
-    Args:
-    - passed_key_values (list of torch.Tensor): Contains past hidden states and past attention values for each layer.
-
-    Returns:
-    - passed_key_values (list of torch.Tensor): Updated past hidden states and past attention values with reset lengths.
-    """
     for i in range(len(passed_key_values)):
         for j in range(2):
             passed_key_values[i][j].current_length.fill_(0)
@@ -212,15 +182,6 @@ def get_nucleus_one_token(logit, temperature, top_p):
     This function selects a token from a given logit distribution using the nucleus sampling strategy.
     It allows for more controlled and diverse generation compared to traditional top-k sampling.
 
-    Args:
-        logit (torch.Tensor): The logits from a language model output, expected to be a 2D tensor (BxC).
-        temperature (float): A temperature parameter to control the randomness in sampling.
-                             Higher values increase diversity, lower values make selections more deterministic.
-        top_p (float): The cumulative probability threshold for nucleus sampling.
-                       It controls the size of the set of high-probability tokens to consider for sampling.
-
-    Returns:
-        torch.Tensor: A tensor containing the indices of the sampled tokens.
     """
     if top_p >= 1:
         return torch.multinomial(F.softmax(logit / temperature, dim=-1), 1)
@@ -242,13 +203,6 @@ def get_typical_one_token(logit, temperature, posterior_threshold, posterior_alp
 
     This function selects a token from a given logit distribution using the typical sampling strategy,
     aiming to balance between diversity and likelihood in a more nuanced way compared to traditional methods.
-
-    Args:
-        logit (torch.Tensor): The logits from a language model output, expected to be a 2D tensor.
-        temperature (float): A parameter to control the randomness in sampling.
-                              Higher values increase diversity, lower values make selections more deterministic.
-        posterior_threshold (float): A threshold to decide the lower bound of probabilities to be considered for sampling.
-        posterior_alpha (float): A scaling factor applied to the entropy-based adaptive threshold.
 
     Returns:
         torch.Tensor: A tensor containing the indices of the sampled tokens.
@@ -287,7 +241,6 @@ def generate_candidates(medusa_logits, logits, tree_indices, retrieve_indices, t
     Resulting candidates (cartesian):
         ["paper carefully", "paper now", "paper quickly"]
     """
-    # Greedy decoding: Select the most probable candidate from the original logits.
     if temperature == 0 or fast:
         candidates_logit = torch.argmax(logits[:, -1]).unsqueeze(0)
     else:
@@ -297,22 +250,15 @@ def generate_candidates(medusa_logits, logits, tree_indices, retrieve_indices, t
             candidates_logit = get_nucleus_one_token(logits[:, -1], temperature, top_p).squeeze(0)
         else:
             raise NotImplementedError
-    # Extract the TOPK candidates from the medusa logits.
     candidates_medusa_logits = torch.topk(medusa_logits[:, 0, -1], TOPK, dim = -1).indices
 
-    # Combine the selected candidate from the original logits with the topk medusa logits.
     candidates = torch.cat([candidates_logit, candidates_medusa_logits.view(-1)], dim=-1)
 
-    # Map the combined candidates to the tree indices to get tree candidates.
     tree_candidates = candidates[tree_indices]
 
-    # Extend the tree candidates by appending a zero.
     tree_candidates_ext = torch.cat([tree_candidates, torch.zeros((1), dtype=torch.long, device=tree_candidates.device)], dim=0)
 
-    # Retrieve the cartesian candidates using the retrieve indices.
     cart_candidates = tree_candidates_ext[retrieve_indices]
-
-    # Unsqueeze the tree candidates for dimension consistency.
     tree_candidates = tree_candidates.unsqueeze(0)
     return cart_candidates, tree_candidates
 
@@ -329,20 +275,13 @@ def tree_decoding(
     Decode the tree candidates using the provided model and reorganize the logits.
     
     Parameters:
-    - model (nn.Module): Model to be used for decoding the tree candidates.
-    - tree_candidates (torch.Tensor): Input candidates based on a tree structure.
-    - past_key_values (torch.Tensor): Past states, such as key and value pairs, used in attention layers.
-    - medusa_position_ids (torch.Tensor): Positional IDs associated with the Medusa structure.
-    - input_ids (torch.Tensor): Input sequence IDs.
-    - retrieve_indices (list or torch.Tensor): Indices for reordering the logits.
-    
+        **kwargs
     Returns:
     - tuple: Returns medusa logits, regular logits, and other outputs from the model.
     """
 
     position_ids = medusa_position_ids + input_ids.shape[1]
 
-    # Use the model to decode the tree candidates. 
     tree_medusa_logits, outputs, tree_logits = model(
         tree_candidates,
         output_orig=True,
@@ -364,17 +303,10 @@ def get_nucleus_posterior_mask(logits, candidates, temperature, top_p):
     temperature scaling and cumulative probability thresholding.
 
     Args:
-        logits (torch.Tensor): A tensor of logits from a language model output.
-        candidates (torch.Tensor): A tensor of candidate tokens to compare against sampled tokens.
-        temperature (float): A parameter to scale the logits, controlling randomness in sampling.
-        top_p (float): The cumulative probability threshold for nucleus sampling.
-
+        **kwargs
     Returns:
         torch.Tensor: A posterior mask indicating which candidate tokens match the sampled tokens.
     """
-    # adapted from https://github.com/huggingface/transformers/blob/18a879f47576822aa1a5c49aecb27d89bfa5fa69/examples/run_generation.py#L79
-
-    # Apply temperature
     logits = logits[:, :-1] / temperature
     n_samples, n_tokens = logits.shape[0], logits.shape[1]
     logits = logits.view(n_samples*n_tokens, -1)
@@ -383,15 +315,11 @@ def get_nucleus_posterior_mask(logits, candidates, temperature, top_p):
         sampled_tokens = sampled_tokens.view(n_samples, n_tokens)
         posterior_mask = (candidates[:, 1:] == sampled_tokens).int()
         return posterior_mask
-    # Convert to probabilities (softmax)
     probs = F.softmax(logits, dim=-1)
-    # Sort the probabilities
     sorted_logits, sorted_indices = torch.sort(probs, descending=True)
 
-    # Compute cumulative probabilities
     cum_probs = torch.cumsum(sorted_logits, dim=-1)
 
-    # Create mask for the top-p nucleus
     sorted_indices_to_remove = cum_probs > top_p
     sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
     sorted_indices_to_remove[..., 0] = 0
@@ -399,24 +327,14 @@ def get_nucleus_posterior_mask(logits, candidates, temperature, top_p):
     indices_to_remove = sorted_indices_to_remove.scatter(dim=1, index=sorted_indices, src=sorted_indices_to_remove)
 
     
-    # Remove low-probability tokens
     logits[indices_to_remove] = float('-inf')
-    # Sample from the remaining tokens
     sampled_tokens = torch.multinomial(F.softmax(logits, dim=-1), 1)
     sampled_tokens = sampled_tokens.view(n_samples, n_tokens)
-    # Create a mask for selected tokens
     posterior_mask = (candidates[:, 1:] == sampled_tokens).int()
 
     return posterior_mask
 
 def get_typical_posterior_mask(logits, candidates, temperature, posterior_threshold, posterior_alpha):
-    """
-    Args:
-        -- **args
-
-    Returns:
-        tensor: A posterior mask indicating which candidate tokens match the sampled tokens.
-    """
     logits = logits[:, :-1] / temperature
     n_samples, n_tokens = logits.shape[0], logits.shape[1]
     logits = logits.view(n_samples*n_tokens, -1)
@@ -453,17 +371,13 @@ def evaluate_posterior(
     - best_candidate (torch.Tensor): Index of the chosen best candidate.
     - accept_length (int): Length of the accepted candidate sequence.
     """
-    # Greedy decoding based on temperature value
     if temperature == 0:
-        # Find the tokens that match the maximum logits for each position in the sequence
         posterior_mask = (
             candidates[:, 1:] == torch.argmax(logits[:, :-1], dim=-1)
         ).int()
         candidates_accept_length = (torch.cumprod(posterior_mask, dim=1)).sum(dim=1)
         accept_length = candidates_accept_length.max()
-        # Choose the best candidate
         if accept_length == 0:
-            # Default to the first candidate if none are accepted
             best_candidate = torch.tensor(0, dtype=torch.long, device=candidates.device)
         else:
             best_candidate = torch.argmax(candidates_accept_length).to(torch.long)
@@ -477,7 +391,7 @@ def evaluate_posterior(
             ).squeeze(-1)
             posterior_entropy = -torch.sum(
                 posterior_prob * torch.log(posterior_prob + 1e-5), dim=-1
-            )  # torch.sum(torch.log(*)) is faster than torch.prod
+            )
             threshold = torch.minimum(
                 torch.ones_like(posterior_entropy) * posterior_threshold,
                 torch.exp(-posterior_entropy) * posterior_alpha,
@@ -485,31 +399,28 @@ def evaluate_posterior(
             posterior_mask = candidates_prob > threshold
             candidates_accept_length = (torch.cumprod(posterior_mask, dim=1)).sum(dim=1)
 
-            # Choose the best candidate based on the evaluated posterior probabilities
             accept_length = candidates_accept_length.max()
             if accept_length == 0:
-                # If no candidates are accepted, just choose the first one
+
                 best_candidate = torch.tensor(0, dtype=torch.long, device=candidates.device)
             else:
                 best_candidates = torch.where(candidates_accept_length == accept_length)[0]
-                # Accept the best one according to likelihood
                 likelihood = torch.sum(
                     torch.log(candidates_prob[best_candidates, :accept_length]), dim=-1
                 )
                 best_candidate = best_candidates[torch.argmax(likelihood)]
             return best_candidate, accept_length
-        # Calculate posterior probabilities and thresholds for candidate selection
         posterior_mask = get_typical_posterior_mask(logits, candidates, temperature, posterior_threshold, posterior_alpha, fast)
         candidates_accept_length = (torch.cumprod(posterior_mask, dim=1)).sum(dim=1)
-        # Choose the best candidate based on the evaluated posterior probabilities
+
         accept_length = candidates_accept_length.max()
         
         if accept_length == 0:
-            # If no candidates are accepted, just choose the first one
+
             best_candidate = torch.tensor(0, dtype=torch.long, device=candidates.device)
         else:
             best_candidate = torch.argmax(candidates_accept_length).to(torch.long)
-            # Accept the best one according to likelihood
+
         return best_candidate, accept_length
     
     if sampling == 'nucleus':
@@ -517,15 +428,16 @@ def evaluate_posterior(
         posterior_mask = get_nucleus_posterior_mask(logits, candidates, temperature, top_p)
         candidates_accept_length = (torch.cumprod(posterior_mask, dim=1)).sum(dim=1)
         accept_length = candidates_accept_length.max()
-        # Choose the best candidate
+
         if accept_length == 0:
-            # Default to the first candidate if none are accepted
+
             best_candidate = torch.tensor(0, dtype=torch.long, device=candidates.device)
         else:
             best_candidate = torch.argmax(candidates_accept_length).to(torch.long)
         return best_candidate, accept_length
     else:
         raise NotImplementedError
+    
 def update_inference_inputs(
     input_ids,
     candidates,
