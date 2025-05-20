@@ -1,6 +1,6 @@
 import torch
 from typing import List, Dict, Any
-from model import MedusaModel
+from model.medusa import MedusaModel
 from dataclasses import dataclass
 from queue import Queue
 import asyncio

@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from dataset import SupervisedDataset, create_dataset, DataArguments, format_conversation
 import transformers
-from model import MedusaModel, MedusaConfig
+from model.medusa import MedusaModel, MedusaConfig
 from transformers import Trainer, BitsAndBytesConfig
 from transformers.trainer_pt_utils import LabelSmoother
 from dataclasses import dataclass, field

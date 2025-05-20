@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 from transformers import PreTrainedModel, PretrainedConfig
 # from transformers import LlamaForCausalLM as KVLlamaForCausalLM
-from llama import LlamaForCausalLM
-from utils import *
-from kv_cache import initialize_past_key_values
-from medusa_choices import vicuna_7b_stage1
+from .llama import LlamaForCausalLM
+from ..utils import *
+from ..kv_cache import initialize_past_key_values
+from .medusa_choices import vicuna_7b_stage1
 from transformers import AutoTokenizer
 import os
 from huggingface_hub import hf_hub_download
