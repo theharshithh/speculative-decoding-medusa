@@ -1,104 +1,80 @@
 # Medusa: Fast LLM Inference with Speculative Decoding
 
-This repository contains an implementation of Medusa, a speculative decoding approach for faster LLM inference. The project includes training, inference, and serving components.
+This repository provides a framework for efficient speculative decoding with large language models (LLMs). The core idea is to enable users to bring their own base model, train speculative heads for parallel token prediction, and deploy the resulting model for fast ONNX-based inference (upto 3x the inference speed).
 
-## Project Structure
+## Overview
 
-```
-.
-├── model.py              # Core Medusa model implementation
-├── utils.py             # Utility functions for Medusa operations
-├── server/             # FastAPI server implementation
-│   ├── app/
-│   │   ├── main.py     # FastAPI application
-│   │   └── model_service.py  # Model serving logic
-│   ├── requirements.txt # Server dependencies
-│   └── test_service.py  # Server testing
-├── inference/          # Inference related code
-│   └── answer.md      # Documentation and explanations
-│   └── infer_onnx.py  # Onnx compilation and inference
-├── train.py           # Training script
-├── dataset.py         # Dataset handling
-└── setup_dataset.py   # Dataset preparation utilities
-└── requirements.txt   # Project dependencies
-└── start_train.sh     # Distributed training 
-└── deepspeed.json     # DeepSpeed configuration
-```
+Medusa enables:
+- Integration of any HuggingFace-compatible base model (e.g., Vicuna, Llama)
+- Training of speculative heads for parallel next-token prediction
+- ONNX export for accelerated inference
+- Simple, modular code for research and extension
 
-## Installation
+## Pretrained Model
 
-We use `uv` for fast, reliable Python package installation. Here's how to get started:
+A ready-to-use speculative decoding model checkpoint is available on Hugging Face Hub:
 
-1. Install `uv`:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+- **Model ID:** `theharshithh/vicuna-7b-speculative`
+- **URL:** [https://huggingface.co/theharshithh/vicuna-7b-speculative](https://huggingface.co/theharshithh/vicuna-7b-speculative)
 
-2. Create a virtual environment and install dependencies:
-```bash
-# Create and activate virtual environment
-uv venv
-source .venv/bin/activate 
+This checkpoint is based on Vicuna-7B and includes trained speculative heads.
 
-uv pip install -r requirements.txt
-```
+## Workflow
 
-## Features
+### 1. Model and Training Configuration
 
-- **Speculative Decoding**: Implements multiple prediction heads for parallel token generation
-- **Dynamic Batching**: Efficient handling of concurrent requests
-- **FastAPI Server**: High-performance API server with async support
-- **ONNX Support**: Hardware-accelerated inference with ONNX runtime
-- **Distributed Training**: Supports distributed training with DeepSpeed
+Configure your base model and speculative head parameters in `start_train.sh`. This script manages distributed training across multiple GPUs. Key arguments:
+- `--model_name_or_path`: Path or identifier for your base model
+- `--medusa_num_heads`: Number of speculative heads
+- `--medusa_num_layers`: Number of layers per head
 
-## Training
-
-To train a Medusa model:
-
-1. Prepare your dataset:
-```bash
-python setup_dataset.py --input_file your_data.json
-```
- - This will create train.json and eval.json in the current directory.
- - ShareGPT dataset link [here](https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/blob/main/ShareGPT_V3_unfiltered_cleaned_split_no_imsorry.json)
-
-2. Start training:
+To launch training:
 ```bash
 chmod +x start_train.sh
 ./start_train.sh
 ```
 
-## Serving
+### 2. Dataset Preparation
 
-To run the inference server:
-
-1. Start the FastAPI server:
+Use `setup_dataset.py` to split your dataset into training and evaluation sets. The script expects a ShareGPT-style JSON by default, but can be adapted for other formats. Example usage:
 ```bash
-cd server
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+python setup_dataset.py --input_file your_data.json
 ```
+This produces `train.json` and `eval.json`.
 
-2. Test the server:
+The data loading and formatting logic is implemented in `dataset.py`. Review or modify this file to customize conversation formatting or tokenization as needed.
+
+### 3. ONNX Export and Inference
+
+After training, export your model to ONNX and perform inference using `inference/infer_onnx.py`:
 ```bash
-python test_service.py
+python inference/infer_onnx.py
 ```
+This script exports both the model and tokenizer, and provides a test generation example.
 
-## Performance
+### 4. Training Loss Visualization
 
-The implementation includes several optimizations:
-- Dynamic batching for efficient resource utilization
-- Speculative decoding for faster inference
-- ONNX runtime for hardware acceleration
-- Async request handling
+Below are the speculative head loss curves from a short training run (limited GPU resources):
 
+![Head 0 Loss](static/head0_loss.png)
+![Head 1 Loss](static/head1_loss.png)
+![Head 3 Loss](static/head3_loss.png)
 
-## Inference
+These results were obtained with constrained compute. Extended training and additional resources are expected to further reduce loss.
 
-To compile the model to ONNX format:
-```bash
-python infer_onnx.py
-```
+## Code Structure
+- `model.py`, `utils.py`: Core logic for speculative heads and Medusa model
+- `start_train.sh`: Distributed training entry point
+- `setup_dataset.py`, `dataset.py`: Dataset preparation and formatting
+- `inference/infer_onnx.py`: ONNX export and inference
+- `spec_choices.py`: Configuration for speculative head choices
 
-## Training Logs:
+## Quick Start
+1. Prepare your dataset with `setup_dataset.py`
+2. Configure and launch training via `start_train.sh`
+3. Export and test ONNX inference with `inference/infer_onnx.py`
+4. Monitor training progress using the provided loss plots in `static/`
 
-Here is the [Wandb project](https://wandb.ai/theharshithdev-exp/huggingface/runs/89ut3wkv?nw=nwusertheharshithdev) to view the traning runs. 
+## Notes
+- The codebase is modular and intended for research and extension.
+- Loss plots reflect short training runs; longer training is recommended for optimal results.
