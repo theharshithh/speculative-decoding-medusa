@@ -56,9 +56,15 @@ This script exports both the model and tokenizer, and provides a test generation
 
 Below are the speculative head loss curves from a short training run (limited GPU resources):
 
-![Head 0 Loss](static/head0_loss.png)
-![Head 1 Loss](static/head1_loss.png)
-![Head 3 Loss](static/head3_loss.png)
+<p align="center">
+  <img src="static/head0_loss.png" alt="Head 0 Loss" width="250"/>
+  <img src="static/head1_loss.png" alt="Head 1 Loss" width="250"/>
+  <img src="static/head3_loss.png" alt="Head 3 Loss" width="250"/>
+</p>
+
+<p align="center">
+  <b>Head 0 Loss</b> &nbsp;&nbsp;&nbsp;&nbsp; <b>Head 1 Loss</b> &nbsp;&nbsp;&nbsp;&nbsp; <b>Head 3 Loss</b>
+</p>
 
 These results were obtained with constrained compute. Extended training and additional resources are expected to further reduce loss.
 
